@@ -1,0 +1,39 @@
+name: Run Tests on Pull Request
+
+on:
+  pull_request:
+    branches: [master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17' # Зміни на свою версію, якщо потрібно
+
+      - name: Run tests with Maven
+        run: mvn test
+
+      # Завантажуємо репорти як артефакт у вкладку "Artifacts"
+      - name: Upload test reports (Surefire)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports
+          path: target/surefire-reports
+
+      # Публікуємо тестовий звіт в Pull Request (з фейлами і назвами)
+      - name: Publish Test Report
+        if: always()  # завжди показувати результати, навіть якщо все пройшло
+        uses: dorny/test-reporter@v1
+        with:
+          name: Test Results
+          path: target/surefire-reports/*.xml
+          reporter: java-junit
