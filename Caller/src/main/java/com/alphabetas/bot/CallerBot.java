@@ -84,23 +84,20 @@ public class CallerBot extends TelegramLongPollingBot {
 //        } catch (TelegramApiException e) {
 //            throw new RuntimeException(e);
 //        }
-
-        PromoteChatMember promoteChatMember = new PromoteChatMember("-1001847907970L", 731921794L, true, true, true, true, true, true, true, true, true, true, true, true);
-        promoteChatMember.setIsAnonymous(true);
-        try {
-            execute(promoteChatMember);
-        } catch (TelegramApiException e) {
-            throw new RuntimeException(e);
-        }
+//
+//        PromoteChatMember promoteChatMember = new PromoteChatMember("-1001847907970L", 731921794L, true, true, true, true, true, true, true, true, true, true, true, true);
+//        promoteChatMember.setIsAnonymous(true);
+//        try {
+//            execute(promoteChatMember);
+//        } catch (TelegramApiException e) {
+//            throw new RuntimeException(e);
+//        }
 
     }
 
     // ========================= MAIN METHOD =========================
     @Override
     public void onUpdateReceived(Update update) {
-//        messageService.sendMessage(-4256380061L, "\uD83D\uFE49", false);
-//        messageService.sendMessage(-4256380061L, "\uC83D\uFE49", false);
-//        messageService.sendMessage(-4256380061L, "\uFFFF\uFF00", false);
 //        System.out.println(statsCountRepo.findAll(StatsCountSpecification.byExample(
 //                StatsCount.builder().week(18).userId(731921794L).countType(StatsCountType.MESSAGE).build()
 //        )));
@@ -108,42 +105,42 @@ public class CallerBot extends TelegramLongPollingBot {
 //        if(true) {
 //            return;
 //        }
-//        if(update.hasMessage()) {
-//            spaceUtils.trimSpaces(update);
-//            if(update.getMessage().getForwardFrom() != null) {
-//                return;
-//            }
-//        }
-//        if(update.hasMessage() && (update.getMessage().hasText() || update.getMessage().getCaption() != null)) {
-//            if (update.getMessage().getCaption() != null) {
-//                update.getMessage().setText(update.getMessage().getCaption());
-//            }
-//            addMessageCount(update);
-//            checkForSemeniv(update);
-//            container.retrieveCommand(update).execute(update);
-//        } else if (update.hasCallbackQuery()) {
-//            String data = update.getCallbackQuery().getData();
-//            CallBack callBack = context.getBean(callbackMap.get(data.split("\\.")[0]).getClass());
-//            callBack.updateCommand(update);
-//            callBack.setMessageService(new MessageServiceImpl(update));
-//            callBack.execute(update);
-//        } else if(update.hasMessage()) {
-//            if(update.getMessage().getMigrateToChatId() != null) {
-//                log.info(update.getMessage().toString());
-//                CallerChat chat = chatService.getById(update.getMessage().getChatId(), update);
-//                chat.setId(update.getMessage().getMigrateToChatId());
-//                chatService.save(chat);
-//
-//                // FIXME CHAT DELETES AFTER MIGRATING TO SUPERGROUP
-////                chat.getConfig().setChatId(chat.getId());
-////                configService.save(chat.getConfig());
-//
-////                messageCountService.saveAll((List<MessageCount>) chat.getMessageCounts());
-//                log.info("group was migrated to supergroup");
-//            }
-//            someOneLeft(update);
-//            someOneEntered(update);
-//        }
+        if(update.hasMessage()) {
+            spaceUtils.trimSpaces(update);
+            if(update.getMessage().getForwardFrom() != null) {
+                return;
+            }
+        }
+        if(update.hasMessage() && (update.getMessage().hasText() || update.getMessage().getCaption() != null)) {
+            if (update.getMessage().getCaption() != null) {
+                update.getMessage().setText(update.getMessage().getCaption());
+            }
+            addMessageCount(update);
+            checkForSemeniv(update);
+            container.retrieveCommand(update).execute(update);
+        } else if (update.hasCallbackQuery()) {
+            String data = update.getCallbackQuery().getData();
+            CallBack callBack = context.getBean(callbackMap.get(data.split("\\.")[0]).getClass());
+            callBack.updateCommand(update);
+            callBack.setMessageService(new MessageServiceImpl(update));
+            callBack.execute(update);
+        } else if(update.hasMessage()) {
+            if(update.getMessage().getMigrateToChatId() != null) {
+                log.info(update.getMessage().toString());
+                CallerChat chat = chatService.getById(update.getMessage().getChatId(), update);
+                chat.setId(update.getMessage().getMigrateToChatId());
+                chatService.save(chat);
+
+                // FIXME CHAT DELETES AFTER MIGRATING TO SUPERGROUP
+//                chat.getConfig().setChatId(chat.getId());
+//                configService.save(chat.getConfig());
+
+//                messageCountService.saveAll((List<MessageCount>) chat.getMessageCounts());
+                log.info("group was migrated to supergroup");
+            }
+            someOneLeft(update);
+            someOneEntered(update);
+        }
     }
     // ======================= MAIN METHOD end ========================
 
