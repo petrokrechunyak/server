@@ -10,14 +10,15 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - caller-data:/var/lib/postgresql/data
     networks:
-      - bot-network
+      - caller-network
 
   bot-a:
     build:
       context: ./Caller
     container_name: caller_bot
+    restart: always
     depends_on:
       - postgres
     environment:
@@ -26,24 +27,10 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       BOT_TOKEN: ${CALLER_TOKEN}
     networks:
-      - bot-network
-
-  bot-b:
-    build:
-      context: ./oblenergoBot
-    container_name: oblenergo_bot
-    depends_on:
-      - postgres
-    environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
-      BOT_TOKEN: ${CALLER_TOKEN}
-    networks:
-      - bot-network
+      - caller-network
 
 volumes:
-  pgdata:
+  caller-data:
 
 networks:
-  bot-network:
+  caller-network:

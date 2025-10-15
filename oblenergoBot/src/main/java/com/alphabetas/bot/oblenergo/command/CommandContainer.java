@@ -1,5 +1,6 @@
 package com.alphabetas.bot.oblenergo.command;
 
+import com.alphabetas.bot.oblenergo.repo.CurrentDateRepo;
 import com.alphabetas.bot.oblenergo.repo.GroupRepo;
 import com.alphabetas.bot.oblenergo.service.MessageService;
 import com.alphabetas.bot.oblenergo.repo.UserRepo;
@@ -15,7 +16,7 @@ public class CommandContainer {
     // All Commands
     Command start, stop, unknown, stats, say, refresh, support;
 
-    public CommandContainer(MessageService messageService, UserRepo userRepo, GroupRepo groupRepo) {
+    public CommandContainer(MessageService messageService, UserRepo userRepo, GroupRepo groupRepo, CurrentDateRepo currentDateRepo) {
         this.commands = new HashMap<>();
         this.messageService = messageService;
 
@@ -27,7 +28,7 @@ public class CommandContainer {
         unknown = new UnknownCommand();
         support = new SupportCommand(messageService);
 
-        new ScheduleUtil(messageService, userRepo, groupRepo);
+        new ScheduleUtil(messageService, userRepo, groupRepo,  currentDateRepo);
 
         commands.put("/start", start);
         commands.put("/stop", stop);

@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  bot-b:
+    build:
+      context: ./
+    container_name: oblenergo_bot
+    depends_on:
+      - postgres-oblenergo
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-oblenergo:5432/${POSTGRES_DB}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      BOT_TOKEN: ${CALLER_TOKEN}
+    networks:
+      - oblenergo-network
+
+  postgres-oblenergo:
+    image: postgres:15
+    container_name: oblenergo-postgres
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - oblenergo-data:/var/lib/postgresql/data
+    networks:
+      - oblenergo-network
+
+volumes:
+  oblenergo-data:
+
+networks:
+  oblenergo-network:

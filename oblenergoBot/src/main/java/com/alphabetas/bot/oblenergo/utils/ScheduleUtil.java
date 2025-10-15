@@ -1,8 +1,10 @@
 package com.alphabetas.bot.oblenergo.utils;
 
 import com.alphabetas.bot.oblenergo.CallerBot;
+import com.alphabetas.bot.oblenergo.model.CurrentDate;
 import com.alphabetas.bot.oblenergo.model.Group;
 import com.alphabetas.bot.oblenergo.model.User;
+import com.alphabetas.bot.oblenergo.repo.CurrentDateRepo;
 import com.alphabetas.bot.oblenergo.repo.GroupRepo;
 import com.alphabetas.bot.oblenergo.repo.UserRepo;
 import com.alphabetas.bot.oblenergo.service.MessageService;
@@ -22,6 +24,7 @@ public class ScheduleUtil {
     private static GroupRepo groupRepo;
     private static UserRepo userRepo;
     private static MessageService messageService;
+    private static CurrentDateRepo currentDateRepo;
     private static final String[] dates = {
             "00:00", "00:30", "01:00", "01:30", "02:00", "02:30",
             "03:00", "03:30", "04:00", "04:30", "05:00", "05:30",
@@ -34,10 +37,11 @@ public class ScheduleUtil {
             "00:00"
     };
 
-    public ScheduleUtil(MessageService messageService, UserRepo userRepo, GroupRepo groupRepo) {
+    public ScheduleUtil(MessageService messageService, UserRepo userRepo, GroupRepo groupRepo, CurrentDateRepo currentDateRepo) {
         ScheduleUtil.messageService = messageService;
         ScheduleUtil.userRepo = userRepo;
         ScheduleUtil.groupRepo = groupRepo;
+        ScheduleUtil.currentDateRepo = currentDateRepo;
     }
 
     public static void checkForSchedule() {
@@ -45,7 +49,7 @@ public class ScheduleUtil {
         Document doc;
         try {
             doc = Jsoup.connect("https://oblenergo.cv.ua/shutdowns/?next")
-                    .userAgent("Chrome/4.0.249.0 Safari/532.5")
+                    .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36")
                     .referrer("https://www.google.com")
                     .get();
         } catch (IOException e) {
@@ -54,14 +58,21 @@ public class ScheduleUtil {
         }
 
         String newDate = doc.select("#gsv > ul > p").eachText().get(0);
+        if(currentDateRepo.findAll().isEmpty()) {
+            currentDateRepo.save(new CurrentDate(newDate));
+        }
 
         updateAndSendSchedule(newDate, doc);
 
         log.info("Checking for new schedule ended");
     }
 
+    private static String getCurrentDate() {
+        return currentDateRepo.findAll().get(0).getDate();
+    }
+
     private static void updateAndSendSchedule(String newDate, Document doc) {
-        boolean newDay = !newDate.equals(MainUtil.readHash("date.txt"));
+        boolean newDay = !newDate.equals(getCurrentDate());
         List<Group> updated = new ArrayList<>();
 
         for (int i = 1; i <= CallerBot.GROUPS_NUMBER; i++) {
@@ -76,8 +87,11 @@ public class ScheduleUtil {
             }
         }
 
+
         if (newDay) {
-            MainUtil.writeToFile(newDate, "date.txt");
+            CurrentDate currentDate = currentDateRepo.findAll().get(0);
+            currentDate.setDate(newDate);
+            currentDateRepo.save(currentDate);
         }
 
         log.info("Schedule updated in number of groups: {}", updated.size());

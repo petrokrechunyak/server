@@ -18,15 +18,6 @@ import java.util.concurrent.Executors;
 public class OblenergoApplication {
 
 	public static void main(String[] args) throws Exception {
-		System.out.println("Getting current date");
-		Document doc = Jsoup.connect("https://oblenergo.cv.ua/shutdowns/")
-				.userAgent("Chrome/4.0.249.0 Safari/532.5")
-				.referrer("http://www.google.com")
-				.get();
-
-		String date = doc.select("#gsv > ul > p").eachText().get(0);
-		MainUtil.writeToFile(date, "date.txt");
-
 		SpringApplication.run(OblenergoApplication.class, args);
 	}
 

@@ -1,5 +1,6 @@
 package com.alphabetas.bot.oblenergo;
 
+import com.alphabetas.bot.oblenergo.repo.CurrentDateRepo;
 import com.alphabetas.bot.oblenergo.repo.GroupRepo;
 import com.alphabetas.bot.oblenergo.service.MessageService;
 import com.alphabetas.bot.oblenergo.service.impl.MessageServiceImpl;
@@ -47,14 +48,16 @@ public class CallerBot extends TelegramLongPollingBot {
 
     private UserRepo userRepo;
     private GroupRepo groupRepo;
+    private CurrentDateRepo currentDateRepo;
 
     public static final int GROUPS_NUMBER = 12;
 
-    public CallerBot(UserRepo userRepo, GroupRepo groupRepo) throws Exception {
+    public CallerBot(UserRepo userRepo, GroupRepo groupRepo, CurrentDateRepo currentDateRepo) throws Exception {
         this.userRepo = userRepo;
         this.groupRepo = groupRepo;
+        this.currentDateRepo = currentDateRepo;
         this.messageService = new MessageServiceImpl(this);
-        this.container = new CommandContainer(messageService, userRepo, groupRepo);
+        this.container = new CommandContainer(messageService, userRepo, groupRepo, currentDateRepo);
 
         prepareUser(userRepo);
         prepareGroups();
