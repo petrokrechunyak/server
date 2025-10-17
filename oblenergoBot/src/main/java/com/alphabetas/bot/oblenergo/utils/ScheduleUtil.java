@@ -67,7 +67,7 @@ public class ScheduleUtil {
         log.info("Checking for new schedule ended");
     }
 
-    private static String getCurrentDate() {
+    public static String getCurrentDate() {
         return currentDateRepo.findAll().get(0).getDate();
     }
 

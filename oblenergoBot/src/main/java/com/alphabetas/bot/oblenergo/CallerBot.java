@@ -112,8 +112,8 @@ public class CallerBot extends TelegramLongPollingBot {
                 group.getUsers().remove(user);
             } else {
 
-                String longMessage = ScheduleUtil.prepareScheduleMessage(group, group.getShutdowns(), MainUtil.readHash("date.txt"), false);
-                String compactMessage = ScheduleUtil.prepareCompactScheduleMessage(group, group.getShutdowns(), MainUtil.readHash("date.txt"), false);
+                String longMessage = ScheduleUtil.prepareScheduleMessage(group, group.getShutdowns(), ScheduleUtil.getCurrentDate(), false);
+                String compactMessage = ScheduleUtil.prepareCompactScheduleMessage(group, group.getShutdowns(), ScheduleUtil.getCurrentDate(), false);
 
                 groupList.add(group);
                 group.getUsers().add(user);
