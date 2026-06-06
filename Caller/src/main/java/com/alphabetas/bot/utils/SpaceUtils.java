@@ -14,6 +14,9 @@ import java.io.*;
 import java.net.URL;
 import java.util.List;
 import java.util.Random;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 public class SpaceUtils {
 
@@ -39,6 +42,14 @@ public class SpaceUtils {
     }
 
     public static void writeFromCaller(Update update, String text) {
+//	Path path = Paths.get("target");
+ //       if(!Files.exists(path)) {
+ //           try {
+//                Files.createDirectory(path);
+//            } catch (IOException e) {
+//                throw new RuntimeException(e);
+//            }
+//        }
         try (BufferedWriter writer = new BufferedWriter(new FileWriter("target/chat" + update.getMessage().getChatId().toString() + update.getMessage().getChat().getTitle(), true))) {
             if (text == null)
                 text = update.getMessage().getText();

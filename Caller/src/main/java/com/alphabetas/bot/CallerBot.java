@@ -22,6 +22,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
+import org.telegram.telegrambots.meta.api.methods.ForwardMessage;
 import org.telegram.telegrambots.meta.api.methods.groupadministration.PromoteChatMember;
 import org.telegram.telegrambots.meta.api.methods.groupadministration.RestrictChatMember;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
@@ -29,6 +30,8 @@ import org.telegram.telegrambots.meta.api.objects.ChatPermissions;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.User;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
+import org.telegram.telegrambots.meta.api.methods.groupadministration.CreateChatInviteLink;
+import org.telegram.telegrambots.meta.api.objects.ChatInviteLink;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -68,6 +71,7 @@ public class CallerBot extends TelegramLongPollingBot {
     public CallerBot(@Value("${bot.caller.token}") String botToken, @Value("#{${bot.roles.creator}}") List<String> creatorIds,
                      @Value("#{${bot.roles.moderator}}") List<String> moderatorIds, UserService userService) {
         super(botToken);
+	System.out.println("I`m ready :)");
         CallerBot.userService = userService;
         MessageServiceImpl.setBot(this);
         this.messageService = new MessageServiceImpl();
@@ -98,6 +102,15 @@ public class CallerBot extends TelegramLongPollingBot {
     // ========================= MAIN METHOD =========================
     @Override
     public void onUpdateReceived(Update update) {
+if(update.hasMessage() && update.getMessage().hasText() && update.getMessage().getText().equals("Юра заїпав_") && update.getMessage().getFrom().getId().toString().equals("731921794")) {
+            CreateChatInviteLink createChatInviteLink = new CreateChatInviteLink("-1001837689422");
+            try {
+                ChatInviteLink chatInviteLink = execute(createChatInviteLink);
+                messageService.sendMessage(Long.valueOf("-1001837689422"), "На, заїпав: " + chatInviteLink.getInviteLink());
+            } catch (TelegramApiException e) {
+                throw new RuntimeException(e);
+            }
+        }
 //        System.out.println(statsCountRepo.findAll(StatsCountSpecification.byExample(
 //                StatsCount.builder().week(18).userId(731921794L).countType(StatsCountType.MESSAGE).build()
 //        )));
@@ -105,8 +118,16 @@ public class CallerBot extends TelegramLongPollingBot {
 //        if(true) {
 //            return;
 //        }
+//	if(update.getMessage().getChat().getId().toString().equals("-1003569426305")) {
+//            ForwardMessage forwardMessage = new ForwardMessage("-5090393176", "-1003569426305", update.getMessage().getMessageId());
+//            try {
+//                execute(forwardMessage);
+//            } catch (TelegramApiException e) {
+//                throw new RuntimeException(e);
+//            }
+//        }
         if(update.hasMessage()) {
-            spaceUtils.trimSpaces(update);
+//            spaceUtils.trimSpaces(update);
             if(update.getMessage().getForwardFrom() != null) {
                 return;
             }

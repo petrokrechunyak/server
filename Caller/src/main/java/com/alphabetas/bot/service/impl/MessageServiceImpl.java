@@ -127,12 +127,12 @@ public class MessageServiceImpl implements MessageService {
         sendMessage.enableHtml(true);
         log.info("Sending message...");
         try {
-            if(update != null) {
-                SpaceUtils.writeFromCaller(update, sendMessage.getText());
-            }
+//            if(update != null) {
+//                SpaceUtils.writeFromCaller(update, sendMessage.getText());
+//            }
             return (Message) bot.execute(sendMessage);
         } catch (TelegramApiException e) {
-            messageService.sendErrorMessage(e.getMessage());
+//            messageService.sendErrorMessage(e.getMessage());
             throw new RuntimeException(e);
         }
     }
@@ -181,7 +181,7 @@ public class MessageServiceImpl implements MessageService {
         try {
             bot.execute(editMessage);
         } catch (TelegramApiException e) {
-            messageService.sendErrorMessage(e.getMessage());
+//            messageService.sendErrorMessage(e.getMessage());
             throw new RuntimeException(e);
         }
     }
@@ -228,7 +228,7 @@ public class MessageServiceImpl implements MessageService {
         try {
             return bot.execute(count);
         } catch (TelegramApiException e) {
-            messageService.sendErrorMessage(e.getMessage());
+//          messageService.sendErrorMessage(e.getMessage());
             return 0;
         }
     }
@@ -239,13 +239,13 @@ public class MessageServiceImpl implements MessageService {
         String text = u.getMessage().getText();
         text = text + "\n\n" + ExceptionUtils.getStackTrace(e);
         text = CommandUtils.deleteBadSymbols(text);
-        sendMessage(Command.TEST_CHAT_ID, text, false);
+//        sendMessage(Command.TEST_CHAT_ID, text, false);
     }
 
     @Override
     public void sendErrorMessage(String stackTrace) {
         log.error(stackTrace);
-        sendMessage(Command.TEST_CHAT_ID, stackTrace, false);
+//        sendMessage(Command.TEST_CHAT_ID, stackTrace, false);
     }
 
     @Override
