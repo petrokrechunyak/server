@@ -2,8 +2,11 @@ package com.alphabetas.bot.commands.admin;
 
 
 import com.alphabetas.bot.commands.Command;
+import com.alphabetas.bot.service.MessageService;
+import com.alphabetas.bot.service.ScheduleService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.io.filefilter.WildcardFileFilter;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.send.SendDocument;
@@ -22,6 +25,10 @@ import static com.alphabetas.bot.service.MessageService.MY_ID;
 @Component
 @Scope("prototype")
 public class BackupCommand extends Command {
+
+    @Autowired
+    private ScheduleService scheduleService;
+
     @Override
     public int execute(Update update) {
         if(!user.getUserId().equals(MY_ID)) {
@@ -36,10 +43,11 @@ public class BackupCommand extends Command {
             e.printStackTrace();
         }
 
-        backupChats();
-        SendDocument document = new SendDocument(Command.TEST_CHAT_ID.toString(), new InputFile(new File("backup")));
-        messageService.sendDocument(document);
+//        backupChats();
+//        SendDocument document = new SendDocument(Command.TEST_CHAT_ID.toString(), new InputFile(new File("backup")));
+//        messageService.sendDocument(document);
 
+        scheduleService.stats();
         return SUCCESS.getReturnCode();
     }
 

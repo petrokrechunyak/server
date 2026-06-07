@@ -23,8 +23,8 @@ public class CommandContainer {
     @Autowired
     private ApplicationContext context;
 
-    @Value("${bot.caller.username}")
-    private String botUsername;
+//    @Value("${bot.caller.username}")
+//    private String botUsername;
 
     public CommandContainer() {
     }
@@ -53,6 +53,6 @@ public class CommandContainer {
         if(args.length == 1) {
             return true;
         }
-        return args[1].equals(botUsername);
+        return args[1].equals("caller_ua_bot");
     }
 }

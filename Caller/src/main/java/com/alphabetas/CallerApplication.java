@@ -5,6 +5,7 @@ import com.alphabetas.bot.callback.DivorceCallback;
 import com.alphabetas.bot.callback.MarriageCallback;
 import com.alphabetas.bot.commands.*;
 import com.alphabetas.bot.commands.admin.BackupCommand;
+import com.alphabetas.bot.commands.admin.RestoreCommand;
 import com.alphabetas.bot.commands.admin.StatsCommand;
 import com.alphabetas.bot.commands.admin.TellCommand;
 import com.alphabetas.bot.group.*;
@@ -54,6 +55,7 @@ public class CallerApplication {
 		new TellCommand();
 		new IdeaCommand();
 		new BackupCommand();
+		new RestoreCommand();
 		new StatsCommand();
 
 		new MarriageCommand();

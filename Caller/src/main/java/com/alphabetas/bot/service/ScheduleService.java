@@ -10,8 +10,11 @@ import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.telegram.telegrambots.meta.api.methods.send.SendDocument;
+import org.telegram.telegrambots.meta.api.objects.InputFile;
 import org.telegram.telegrambots.meta.api.objects.chatmember.*;
 
+import java.io.File;
 import java.util.List;
 
 import static com.alphabetas.bot.utils.ServiceUtils.chatService;
@@ -24,6 +27,9 @@ public class ScheduleService {
 
     @Autowired
     private MessageCountService messageCountService;
+
+    @Autowired
+    private DatabaseBackupService databaseBackupService;
 
     private static MessageService messageService;
 
@@ -119,20 +125,67 @@ public class ScheduleService {
 
     }
 
-    @Scheduled(fixedDelay = 1000 * 60 * 60 * 24)
+    @Scheduled(cron = "0 0 3 * * *")
     public void stats() {
-        List<CallerChat> all = chatService.findAll();
-        int callerCalls = 0;
-        int simpleCalls = 0;
-        for (CallerChat chat: all) {
-            callerCalls += chat.getCallerCalls();
-            simpleCalls += chat.getSimpleCalls();
-            chatService.save(chat);
+        new Thread(() -> {
+            try {
+                List<CallerChat> all = chatService.findAll();
+                int callerCalls = 0;
+                int simpleCalls = 0;
+                for (CallerChat chat: all) {
+                    callerCalls += chat.getCallerCalls();
+                    simpleCalls += chat.getSimpleCalls();
+                    chatService.save(chat);
+                }
+                messageService.sendMessage(MessageService.MY_ID, "Загальна кількість чатів з Кликуном: <b>" + all.size() + "</b>\n" +
+                        "Кількість закликів через Кликуна: <b>" + callerCalls + "</b>\n" +
+                        "Кількість закликів через собачку: <b>" + simpleCalls + "</b>", false);
 
+                // Create and send database backup
+                log.info("Starting scheduled database backup...");
+                try {
+                    String backupFilePath = databaseBackupService.createBackup();
+                    File backupFile = new File(backupFilePath);
+
+                    if (backupFile.exists()) {
+                        SendDocument document = new SendDocument(String.valueOf(MessageService.MY_ID), new InputFile(backupFile));
+                        messageService.sendDocument(document);
+                        log.info("Backup file sent successfully");
+
+                        // Optional: keep only last 3 backups to save disk space
+                        cleanOldBackups();
+                    } else {
+                        log.error("Backup file was not created");
+                        messageService.sendMessage(MessageService.MY_ID, "❌ Помилка: файл резервної копії не було створено", false);
+                    }
+                } catch (Exception e) {
+                    log.error("Error during scheduled backup: {}", ExceptionUtils.getStackTrace(e));
+                    messageService.sendMessage(MessageService.MY_ID, "❌ Помилка при створенні резервної копії:\n" + e.getMessage(), false);
+                }
+            } catch (Exception e) {
+                log.error("Error in stats method: {}", ExceptionUtils.getStackTrace(e));
+            }
+        }).start();
+    }
+
+    /**
+     * Keeps only the last 3 backup files
+     */
+    private void cleanOldBackups() {
+        try {
+            File[] backups = databaseBackupService.getAvailableBackups();
+            if (backups != null && backups.length > 3) {
+                // Sort by last modified time
+                java.util.Arrays.sort(backups, (f1, f2) -> Long.compare(f1.lastModified(), f2.lastModified()));
+
+                // Delete old backups (keep last 3)
+                for (int i = 0; i < backups.length - 3; i++) {
+                    databaseBackupService.deleteBackup(backups[i].getAbsolutePath());
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Error cleaning old backups: {}", e.getMessage());
         }
-        messageService.sendMessage(MessageService.MY_ID, "Загальна кількість чатів з Кликуном: <b>" + all.size() + "</b>\n" +
-                "Кількість закликів через Кликуна: <b>" + callerCalls + "</b>\n" +
-                "Кількість закликів через собачку: <b>" + simpleCalls + "</b>", false);
     }
 
 }

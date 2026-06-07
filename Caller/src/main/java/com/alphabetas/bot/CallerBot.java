@@ -45,9 +45,6 @@ import static com.alphabetas.bot.utils.ServiceUtils.*;
 @NoArgsConstructor
 public class CallerBot extends TelegramLongPollingBot {
 
-    public static void main(String[] args) {
-    }
-
 
     @Value("${bot.caller.username}")
     private String botUsername;

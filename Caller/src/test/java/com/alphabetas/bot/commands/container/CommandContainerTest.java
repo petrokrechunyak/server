@@ -115,7 +115,7 @@ public class CommandContainerTest extends CommandTest {
         Command command = new HelpCommand();
         decorateCommand(command);
         message.setText("/help@caller_ua_bot");
-        container.setBotUsername("caller_ua_bot");
+//        container.setBotUsername("caller_ua_bot");
 
         when(context.getBean((Class<Command>) any())).thenReturn(command);
 
