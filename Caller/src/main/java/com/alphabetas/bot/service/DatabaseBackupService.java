@@ -127,21 +127,24 @@ public class DatabaseBackupService {
 
             log.info("Starting database restore from: {}", backupFilePath);
 
-            // Create a temporary file with filtered SQL
+            // Clear whole DB schema first to avoid conflicts (drop all objects)
+            clearDatabaseSchema();
+
+            // Create a temporary file with filtered SQL (also adds IF NOT EXISTS where applicable)
             tempFile = File.createTempFile("backup_", ".sql");
             filterBackupFile(backupFile, tempFile);
 
             String dbName = extractDatabaseName();
 
-            // Use psql for plain text SQL files
+            // Use psql for plain text SQL files; stop on first error
             ProcessBuilder pb = new ProcessBuilder(
                     "psql",
                     "-U", datasourceUsername,
                     "-h", dbHost,
                     "-p", dbPort,
                     "-d", dbName,
-                    "-f", tempFile.getAbsolutePath(),
-                    "-v", "ON_ERROR_STOP=0"
+                    "-v", "ON_ERROR_STOP=1",
+                    "-f", tempFile.getAbsolutePath()
             );
 
             // Set password via environment variable
@@ -190,8 +193,42 @@ public class DatabaseBackupService {
     }
 
     /**
+     * Executes a psql command to drop and recreate the public schema, fully clearing DB objects.
+     * This is safer than relying on individual DROP statements in the dump and avoids ordering issues.
+     */
+    private void clearDatabaseSchema() throws IOException, InterruptedException {
+        String dbName = extractDatabaseName();
+        String cmd = "DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO public;";
+
+        ProcessBuilder pb = new ProcessBuilder(
+                "psql",
+                "-U", datasourceUsername,
+                "-h", dbHost,
+                "-p", dbPort,
+                "-d", dbName,
+                "-c", cmd
+        );
+        pb.environment().put("PGPASSWORD", datasourcePassword);
+        pb.redirectErrorStream(true);
+
+        Process process = pb.start();
+
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                log.debug("psql-clear: {}", line);
+            }
+        }
+
+        int exit = process.waitFor();
+        if (exit != 0) {
+            throw new IOException("Failed to clear database schema, psql exit code: " + exit);
+        }
+    }
+
+    /**
      * Filters backup file to remove incompatible PostgreSQL configuration parameters
-     * Handles version compatibility issues
+     * Handles version compatibility issues and adds IF NOT EXISTS where reasonable
      */
     private void filterBackupFile(File sourceFile, File targetFile) throws IOException {
         // List of incompatible configuration parameters that might cause issues on older versions
@@ -210,8 +247,10 @@ public class DatabaseBackupService {
             while ((line = reader.readLine()) != null) {
                 boolean shouldSkip = false;
 
+                String trimmed = line.trim();
+
                 // Skip SET statements with incompatible parameters
-                if (line.trim().startsWith("SET ")) {
+                if (trimmed.startsWith("SET ")) {
                     for (String param : incompatibleParams) {
                         if (line.contains(param)) {
                             log.debug("Skipping incompatible parameter: {}", line);
@@ -221,10 +260,26 @@ public class DatabaseBackupService {
                     }
                 }
 
-                if (!shouldSkip) {
-                    writer.write(line);
-                    writer.write("\n");
+                if (shouldSkip) {
+                    continue;
                 }
+
+                // Add IF NOT EXISTS checks for common CREATE statements to make restore idempotent
+                // Avoid double-inserting IF NOT EXISTS
+                if (trimmed.startsWith("CREATE TABLE ") && !trimmed.startsWith("CREATE TABLE IF NOT EXISTS")) {
+                    line = line.replaceFirst("CREATE TABLE\\s+", "CREATE TABLE IF NOT EXISTS ");
+                } else if (trimmed.startsWith("CREATE SEQUENCE ") && !trimmed.startsWith("CREATE SEQUENCE IF NOT EXISTS")) {
+                    line = line.replaceFirst("CREATE SEQUENCE\\s+", "CREATE SEQUENCE IF NOT EXISTS ");
+                } else if (trimmed.startsWith("CREATE EXTENSION ") && !trimmed.startsWith("CREATE EXTENSION IF NOT EXISTS")) {
+                    line = line.replaceFirst("CREATE EXTENSION\\s+", "CREATE EXTENSION IF NOT EXISTS ");
+                } else if (trimmed.startsWith("CREATE INDEX ") && !trimmed.startsWith("CREATE INDEX IF NOT EXISTS")) {
+                    line = line.replaceFirst("CREATE INDEX\\s+", "CREATE INDEX IF NOT EXISTS ");
+                } else if (trimmed.startsWith("CREATE VIEW ") && !trimmed.startsWith("CREATE VIEW IF NOT EXISTS")) {
+                    line = line.replaceFirst("CREATE VIEW\\s+", "CREATE VIEW IF NOT EXISTS ");
+                }
+
+                writer.write(line);
+                writer.write("\n");
             }
         }
 
@@ -266,7 +321,3 @@ public class DatabaseBackupService {
         }
     }
 }
-
-
-
-

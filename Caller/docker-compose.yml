@@ -4,7 +4,7 @@ services:
   postgres:
     image: postgres:15
     container_name: my-postgres
-#    restart: always
+    restart: always
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
@@ -17,7 +17,7 @@ services:
   bot-a:
     build: .
     container_name: caller_bot
-#    restart: always
+    restart: always
     env_file:
       - .env
     depends_on:
