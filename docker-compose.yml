@@ -10,15 +10,16 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
-      - caller-data:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/data
     networks:
-      - caller-network
+      - bot-network
 
   bot-a:
-    build:
-      context: ./Caller
+    build: ./Caller
     container_name: caller_bot
     restart: always
+    env_file:
+      - .env
     depends_on:
       - postgres
     environment:
@@ -26,11 +27,16 @@ services:
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       BOT_TOKEN: ${CALLER_TOKEN}
+      DB_HOST: postgres
+      DB_PORT: 5432
+    volumes:
+      - backups:/app/backups
     networks:
-      - caller-network
+      - bot-network
 
 volumes:
-  caller-data:
+  pgdata:
+  backups:
 
 networks:
-  caller-network:
+  bot-network:
