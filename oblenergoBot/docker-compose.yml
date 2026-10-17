@@ -5,13 +5,16 @@ services:
     build:
       context: ./
     container_name: oblenergo_bot
+    restart: always
     depends_on:
-      - postgres-oblenergo
+      postgres-oblenergo:
+        condition: service_healthy
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-oblenergo:5432/${POSTGRES_DB}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
-      BOT_TOKEN: ${CALLER_TOKEN}
+      BOT_TOKEN: ${OBLENERGO_TOKEN:?set OBLENERGO_TOKEN in .env}
+      BOT_USERNAME: ${OBLENERGO_USERNAME:?set OBLENERGO_USERNAME in .env}
     networks:
       - oblenergo-network
 
@@ -25,6 +28,11 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - oblenergo-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     networks:
       - oblenergo-network
 

@@ -21,6 +21,9 @@ public class CurrentDate {
 
     private String date;
 
+    // true while the site shows emergency outages instead of the schedule; null (old rows) means false
+    private Boolean emergency;
+
     public CurrentDate(String date) {
         this.date = date;
     }

@@ -16,7 +16,14 @@ import org.telegram.telegrambots.meta.api.objects.Message;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @Slf4j
 public class ScheduleUtil {
@@ -36,6 +43,13 @@ public class ScheduleUtil {
             "21:00", "21:30", "22:00", "22:30", "23:00", "23:30",
             "00:00"
     };
+    public static final String EMERGENCY_TEXT = "⚠️ <b>Запроваджено екстрені відключення по Чернівецькій області</b>\n\n" +
+            "Графіки погодинних відключень тимчасово не діють. Відключення можуть бути без попередження.\n\n" +
+            "Коли графіки знову почнуть діяти, вас буде повідомлено.";
+    private static final String EMERGENCY_ENDED_TEXT = "✅ <b>Екстрені відключення скасовано, графіки знову діють.</b>\n\n";
+    private static final int MAX_MESSAGE_LENGTH = 4096;
+    // one char per half-hour slot: з - powered, в - off, м - maybe powered
+    private static final Pattern SCHEDULE_PATTERN = Pattern.compile("[взм]{" + (dates.length - 1) + "}");
 
     public ScheduleUtil(MessageService messageService, UserRepo userRepo, GroupRepo groupRepo, CurrentDateRepo currentDateRepo) {
         ScheduleUtil.messageService = messageService;
@@ -44,7 +58,8 @@ public class ScheduleUtil {
         ScheduleUtil.currentDateRepo = currentDateRepo;
     }
 
-    public static void checkForSchedule() {
+    // synchronized: /refresh and the scheduler could otherwise both detect the same change and broadcast it twice
+    public static synchronized void checkForSchedule() {
         log.info("checking for new schedule");
         Document doc;
         try {
@@ -57,28 +72,83 @@ public class ScheduleUtil {
             return;
         }
 
-        String newDate = doc.select("#gsv > ul > p").eachText().get(0);
+        processPage(doc);
+
+        log.info("Checking for new schedule ended");
+    }
+
+    private static void processPage(Document doc) {
+        // during emergency outages the site replaces the schedule with this banner
+        if (!doc.select("article.wrap_article_v2_emergency").isEmpty()) {
+            startEmergency();
+            return;
+        }
+
+        List<String> dateTexts = doc.select("#gsv > ul > p").eachText();
+        if (dateTexts.isEmpty()) {
+            log.warn("Schedule date not found on the page, skipping check");
+            return;
+        }
+        String newDate = dateTexts.get(0);
         if(currentDateRepo.findAll().isEmpty()) {
             currentDateRepo.save(new CurrentDate(newDate));
         }
 
         updateAndSendSchedule(newDate, doc);
-
-        log.info("Checking for new schedule ended");
     }
 
     public static String getCurrentDate() {
         return currentDateRepo.findAll().get(0).getDate();
     }
 
+    public static boolean isEmergency() {
+        return currentDateRepo.findAll().stream().anyMatch(state -> Boolean.TRUE.equals(state.getEmergency()));
+    }
+
+    private static void startEmergency() {
+        List<CurrentDate> rows = currentDateRepo.findAll();
+        // no row yet if the bot is first started during emergency outages; the date is filled in once the schedule is back
+        CurrentDate state = rows.isEmpty() ? new CurrentDate((String) null) : rows.get(0);
+        if (Boolean.TRUE.equals(state.getEmergency())) {
+            log.info("Emergency outages are still active");
+            return;
+        }
+        state.setEmergency(true);
+        currentDateRepo.save(state);
+
+        log.info("Emergency outages started");
+        long time = System.currentTimeMillis();
+        CompletableFuture<?>[] sends = userRepo.getAllBySubscribedTrueAndGroupsNotEmptyOrderByPriorityAsc().stream()
+                .map(user -> sendMessageToUser(user, EMERGENCY_TEXT))
+                .toArray(CompletableFuture[]::new);
+        reportWhenSent(sends, "з попередженням про екстрені відключення", time);
+    }
+
     private static void updateAndSendSchedule(String newDate, Document doc) {
-        boolean newDay = !newDate.equals(getCurrentDate());
+        // parse every group before saving anything: failing halfway would leave some groups
+        // updated in the DB but never announced, and the next check would see no change
+        String[] schedules = new String[CallerBot.GROUPS_NUMBER + 1];
+        for (int i = 1; i <= CallerBot.GROUPS_NUMBER; i++) {
+            List<String> texts = doc.select("div#inf" + i).eachText();
+            String el = texts.isEmpty() ? "" : texts.get(0).replaceAll(" ", "").replace("мз", "м");
+            if (!SCHEDULE_PATTERN.matcher(el).matches()) {
+                log.warn("Unexpected schedule for group {}: '{}', skipping check", i, el);
+                return;
+            }
+            schedules[i] = el;
+        }
+
+        CurrentDate state = currentDateRepo.findAll().get(0);
+        boolean newDay = !newDate.equals(state.getDate());
+        // the schedule is back after emergency outages: resend it to everyone, like on a new day
+        boolean emergencyEnded = Boolean.TRUE.equals(state.getEmergency());
+        boolean resendAll = newDay || emergencyEnded;
         List<Group> updated = new ArrayList<>();
 
         for (int i = 1; i <= CallerBot.GROUPS_NUMBER; i++) {
-            String el = doc.select("div#inf" + i).eachText().get(0).replaceAll(" ", "").replace("мз", "м");
+            String el = schedules[i];
             Group group = groupRepo.findById(i).get();
-            if (newDay || !el.equals(group.getShutdowns())) {
+            if (resendAll || !el.equals(group.getShutdowns())) {
                 log.info("Schedule updated in group {}", group.getGroupId());
                 group.setOldShutdowns(group.getShutdowns());
                 group.setShutdowns(el);
@@ -88,29 +158,96 @@ public class ScheduleUtil {
         }
 
 
-        if (newDay) {
-            CurrentDate currentDate = currentDateRepo.findAll().get(0);
-            currentDate.setDate(newDate);
-            currentDateRepo.save(currentDate);
+        if (resendAll) {
+            state.setDate(newDate);
+            state.setEmergency(false);
+            currentDateRepo.save(state);
         }
+        if (emergencyEnded) {
+            log.info("Emergency outages ended");
+        }
+        // sent as part of each schedule message, so it can't arrive after the schedule
+        String prefix = emergencyEnded ? EMERGENCY_ENDED_TEXT : "";
 
         log.info("Schedule updated in number of groups: {}", updated.size());
-        updated.parallelStream().forEach(group -> {
-            long time = System.currentTimeMillis();
+        if (updated.isEmpty()) {
+            return;
+        }
 
-            String longMessage = prepareScheduleMessage(group, group.getShutdowns(), newDate, newDay);
-            String compactMessage = prepareCompactScheduleMessage(group, group.getShutdowns(), newDate, newDay);
+        // built once per group; these Group instances are the only ones holding oldShutdowns for highlighting
+        Map<Integer, String> longMessages = new HashMap<>();
+        Map<Integer, String> compactMessages = new HashMap<>();
+        for (Group group : updated) {
+            longMessages.put(group.getGroupId(), prepareScheduleMessage(group, group.getShutdowns(), newDate, resendAll));
+            compactMessages.put(group.getGroupId(), prepareCompactScheduleMessage(group, group.getShutdowns(), newDate, resendAll));
+        }
 
+        // per user, so someone subscribed to several updated groups gets them together instead of one message each
+        long time = System.currentTimeMillis();
+        List<CompletableFuture<Message>> sends = new ArrayList<>();
+        for (User user : userRepo.findSubscribedWithGroups()) {
+            Map<Integer, String> messages = Boolean.TRUE.equals(user.getCompact()) ? compactMessages : longMessages;
+            List<String> parts = user.getGroups().stream()
+                    .map(Group::getGroupId)
+                    .sorted()
+                    .map(messages::get)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toList());
+            // queued back to back, so a user's messages go out one right after another, in group order
+            for (String message : packMessages(prefix, parts)) {
+                sends.add(sendMessageToUser(user, message));
+            }
+        }
+        String groupIds = updated.stream().map(group -> group.getGroupId().toString()).collect(Collectors.joining(", "));
+        reportWhenSent(sends.toArray(new CompletableFuture[0]), "з графіками груп " + groupIds, time);
+    }
 
-            group.getUsers().parallelStream().filter(User::getSubscribed).forEach((user) -> {
-                sendMessageToUser(user, user.getCompact().equals(Boolean.TRUE) ? compactMessage : longMessage);
-            });
+    /**
+     * Joins group schedules into as few messages as fit Telegram's length limit, never splitting
+     * one group's schedule between messages. The prefix goes only at the start of the first message.
+     * <p>
+     * Worst case one group takes ~1200 chars detailed and ~1400 compact, so at least 3 detailed
+     * or 2 compact groups always fit in one message.
+     */
+    private static List<String> packMessages(String prefix, List<String> parts) {
+        List<String> messages = new ArrayList<>();
+        StringBuilder current = new StringBuilder(prefix);
+        int length = visibleLength(prefix);
+        boolean empty = true;
+        for (String rawPart : parts) {
+            String part = rawPart.stripTrailing();
+            int partLength = visibleLength(part);
+            if (!empty && length + 2 + partLength > MAX_MESSAGE_LENGTH) {
+                messages.add(current.toString());
+                current = new StringBuilder();
+                length = 0;
+                empty = true;
+            }
+            if (!empty) {
+                current.append("\n\n");
+                length += 2;
+            }
+            current.append(part);
+            length += partLength;
+            empty = false;
+        }
+        if (!empty) {
+            messages.add(current.toString());
+        }
+        return messages;
+    }
 
-            userRepo.saveAll(group.getUsers());
+    // Telegram's limit applies to the text after HTML parsing, counted in UTF-16 units like String.length()
+    private static int visibleLength(String html) {
+        return html.replaceAll("<[^>]+>", "").length();
+    }
 
-            sendToMe("Усі повідомлення \"" + group.getUsers().size() + "\" надіслані для групи " + group.getGroupId() + " за " + (System.currentTimeMillis() - time) + " мілісекунд");
-
-            log.info("Schedule to group " + group.getGroupId() + " sent");
+    // sends are async, so report only once they have actually finished
+    private static void reportWhenSent(CompletableFuture<?>[] sends, String what, long startTime) {
+        CompletableFuture.allOf(sends).whenComplete((ignored, e) -> {
+            long failed = Arrays.stream(sends).filter(CompletableFuture::isCompletedExceptionally).count();
+            sendToMe("Усі повідомлення \"" + sends.length + "\" надіслані " + what + " за " + (System.currentTimeMillis() - startTime) + " мілісекунд"
+                    + (failed > 0 ? " (не доставлено: " + failed + ")" : ""));
         });
     }
 
@@ -120,13 +257,13 @@ public class ScheduleUtil {
                 ? "Графік на <b>" + date + "</b>"
                 : "Зміни в графіку на <b>" + date + "</b>").append(" в групі <u>")
                 .append(g.getGroupId()).append("</u>\n\n");
-        if (g.getOldShutdowns() == null) {
-            g.setOldShutdowns(g.getShutdowns());
-        }
+        // don't write this back into g: prepareCompactScheduleMessage checks oldShutdowns == null for its header
+        String old = g.getOldShutdowns() == null ? newSchedule : g.getOldShutdowns();
         for (int i = 0; i < args.length; i += 2) {
             builder.append(dates[i]).append(" - ").append(dates[i + 2])
                     .append(": ");
-            if (newDay || !args[i].equals(Character.toString(g.getOldShutdowns().charAt(i)))) {
+            // each line is one hour = two half-hour slots, so compare both
+            if (newDay || !(args[i] + args[i + 1]).equals(old.substring(i, i + 2))) {
                 if (args[i].equals(args[i + 1])) {
                     switch (args[i]) {
                         case "в":
@@ -218,10 +355,6 @@ public class ScheduleUtil {
                 .append(" в групі <u>")
                 .append(g.getGroupId()).append("</u>\n\n");
 
-        if (g.getOldShutdowns() == null) {
-            g.setOldShutdowns(g.getShutdowns());
-        }
-
         char prev = newSchedule.charAt(0);
         int startIndex = 0;
 
@@ -258,14 +391,20 @@ public class ScheduleUtil {
         }
     }
 
-    private static void sendMessageToUser(User user, String message) {
-        messageService.sendMessage(user.getUserId(), message).thenAccept(result -> {
-            if (result.getText().contains("[403]")) {
-                if (user.getSubscribed()) {
-                    user.setSubscribed(false);
-                    messageService.sendMessage(-4592105386L, getUserLink(user) + " - кинув бота в чс((");
-                }
+    public static CompletableFuture<Message> sendMessageToUser(User user, String message) {
+        return messageService.sendBulkMessage(user.getUserId(), message).whenComplete((result, e) -> {
+            if (e != null && MainUtil.isBlockedByUser(e)) {
+                unsubscribeBlockedUser(user.getUserId());
             }
+        });
+    }
+
+    private static void unsubscribeBlockedUser(Long userId) {
+        // reload instead of saving the caller's copy, which may be stale (e.g. compact mode toggled since)
+        userRepo.findById(userId).filter(User::getSubscribed).ifPresent(user -> {
+            user.setSubscribed(false);
+            userRepo.save(user);
+            messageService.sendMessage(-4592105386L, getUserLink(user) + " - кинув бота в чс((");
         });
     }
 
@@ -276,6 +415,5 @@ public class ScheduleUtil {
 
     public static void sendToMe(String s) {
         messageService.sendMessage(-4592105386L, s);
-        MainUtil.sleep(1L);
     }
 }

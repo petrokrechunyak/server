@@ -68,11 +68,7 @@ public class StartCommand implements Command {
         }
 
     SendMessage prepareMessage(User user) {
-        SendMessage sendMessage = new SendMessage(user.getUserId().toString(),
-                "Виберіть групу по якій хочете отримувати графіки(можна вибрати декілька)!\n" +
-                        "Для відписки напишіть /stop\n" +
-                        "Буду вдячний вашій підтримці: /support\n\n" +
-                        "Щоб знайти свою групу нажміть <u><a href='https://oblenergo.cv.ua/shutdowns-search/'>сюди</a></u>");
+        SendMessage sendMessage = new SendMessage(user.getUserId().toString(), MainUtil.GROUP_SELECTION_TEXT);
 
         sendMessage.setReplyMarkup(MainUtil.prepareKeyboard(user));
         sendMessage.enableHtml(true);

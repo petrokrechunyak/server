@@ -27,8 +27,16 @@ public interface MessageService {
     CompletableFuture<Message> sendMessage(Long chatId, String message);
 
     /**
+     * Same as {@link #sendMessage(Long, String)}, but queued behind every non-bulk message.
+     * Use for broadcasts, so replies to users don't wait for the whole broadcast.
+     */
+    CompletableFuture<Message> sendBulkMessage(Long chatId, String message);
+
+    /**
+     * Queues any Bot API call (e.g. {@link SendMessage}, EditMessageText) without waiting for it;
+     * failures are logged.
+     *
      * @param sendMessage {@link SendMessage} object that need to be sent
-     * @return {@link Message} that has been already sent
      */
     void sendMessage(BotApiMethod sendMessage);
 

@@ -21,11 +21,11 @@ public class StatsCommand implements Command{
     public void execute(Update update) {
         if(update.getMessage().getFrom().getId().equals(MY_ID)) {
             StringBuilder builder = new StringBuilder("Підписано користувачів: ")
-                    .append(userRepo.getAllBySubscribedTrue().size())
+                    .append(userRepo.countBySubscribedTrue())
                     .append("\nВідписано користувачів: ")
-                    .append(userRepo.getAllBySubscribedFalse().size())
+                    .append(userRepo.countBySubscribedFalse())
                     .append("\nОтримують графіки: ")
-                    .append(userRepo.getAllBySubscribedTrueAndGroupsNotEmpty().size());
+                    .append(userRepo.countBySubscribedTrueAndGroupsNotEmpty());
             SendMessage message = new SendMessage(MY_ID.toString(), builder.toString());
             service.sendMessage(message);
         }

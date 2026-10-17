@@ -14,7 +14,7 @@ public class CommandContainer {
     private final MessageService messageService;
 
     // All Commands
-    Command start, stop, unknown, stats, say, refresh, support;
+    Command start, stop, unknown, stats, say, refresh, support, priority;
 
     public CommandContainer(MessageService messageService, UserRepo userRepo, GroupRepo groupRepo, CurrentDateRepo currentDateRepo) {
         this.commands = new HashMap<>();
@@ -27,6 +27,7 @@ public class CommandContainer {
         refresh = new RefreshCommand(messageService, userRepo, groupRepo);
         unknown = new UnknownCommand();
         support = new SupportCommand(messageService);
+        priority = new PriorityCommand(messageService, userRepo);
 
         new ScheduleUtil(messageService, userRepo, groupRepo,  currentDateRepo);
 
@@ -36,10 +37,13 @@ public class CommandContainer {
         commands.put("/say", say);
         commands.put("/refresh", refresh);
         commands.put("/support", support);
+        commands.put("/priority", priority);
     }
 
     public Command retrieveCommand(String command){
-        return commands.getOrDefault(command.split("[ @]")[0].toLowerCase(), unknown);
+        // \s so "/say\ntext" works; split returns an empty array for input like "@"
+        String[] parts = command.trim().split("[\\s@]");
+        return parts.length == 0 ? unknown : commands.getOrDefault(parts[0].toLowerCase(), unknown);
     }
 
 }

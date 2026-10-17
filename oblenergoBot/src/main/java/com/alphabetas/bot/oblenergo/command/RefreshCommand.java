@@ -12,6 +12,8 @@ public class RefreshCommand implements Command {
     private UserRepo userRepo;
     private GroupRepo groupRepo;
 
+    private static final Long MY_ID = 731921794L;
+
     public RefreshCommand(MessageService service, UserRepo userRepo, GroupRepo groupRepo) {
         this.service = service;
         this.userRepo = userRepo;
@@ -20,7 +22,8 @@ public class RefreshCommand implements Command {
 
     @Override
     public void execute(Update update) {
-        ScheduleUtil.checkForSchedule();
-
+        if(update.getMessage().getFrom().getId().equals(MY_ID)) {
+            ScheduleUtil.checkForSchedule();
+        }
     }
 }

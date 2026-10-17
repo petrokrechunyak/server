@@ -12,6 +12,7 @@ import org.jsoup.nodes.Document;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
+import org.telegram.telegrambots.meta.exceptions.TelegramApiRequestException;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -20,6 +21,7 @@ import java.net.URL;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -27,6 +29,14 @@ import java.util.logging.Logger;
 
 @Slf4j
 public class MainUtil {
+
+    public static final Long ADMIN_ID = 731921794L;
+
+    public static final String GROUP_SELECTION_TEXT =
+            "Виберіть групу по якій хочете отримувати графіки(можна вибрати декілька)!\n" +
+            "Для відписки напишіть /stop\n" +
+            "Буду вдячний вашій підтримці: /support\n\n" +
+            "Щоб знайти свою групу нажміть <u><a href='https://oblenergo.cv.ua/shutdowns-search/'>сюди</a></u>";
 
     public static InlineKeyboardMarkup prepareKeyboard(User user) {
         List<List<InlineKeyboardButton>> allRows = new ArrayList<>();
@@ -142,6 +152,23 @@ public class MainUtil {
     }
 
     public static String makeLink(Long id, String firstName) {
-        return String.format("<a href='tg://user?id=%d'>%s</a>", id, firstName);
+        return String.format("<a href='tg://user?id=%d'>%s</a>", id, escapeHtml(firstName));
+    }
+
+    public static String escapeHtml(String input) {
+        if (input == null) {
+            return "";
+        }
+        return input.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+    }
+
+    /**
+     * @param e error from a failed send future (possibly wrapped in {@link CompletionException})
+     * @return true if Telegram answered 403, i.e. the user blocked the bot or deleted the account
+     */
+    public static boolean isBlockedByUser(Throwable e) {
+        Throwable cause = e instanceof CompletionException && e.getCause() != null ? e.getCause() : e;
+        return cause instanceof TelegramApiRequestException
+                && Integer.valueOf(403).equals(((TelegramApiRequestException) cause).getErrorCode());
     }
 }

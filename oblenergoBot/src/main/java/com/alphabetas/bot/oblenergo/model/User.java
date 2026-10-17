@@ -19,6 +19,8 @@ import java.util.Objects;
 @AllArgsConstructor
 public class User {
 
+    public static final int DEFAULT_PRIORITY = 100;
+
     @Id
     private Long userId;
 
@@ -29,6 +31,9 @@ public class User {
     private Boolean subscribed;
 
     private Boolean compact;
+
+    // broadcasts go out in ascending order: lower gets schedules first
+    private Integer priority;
 
     @ManyToMany(mappedBy = "users")
     private List<Group> groups;
@@ -47,6 +52,7 @@ public class User {
         this.firstname = MainUtil.removeBadSymbols(firstname);
         this.subscribed = subscribed;
         this.compact = false;
+        this.priority = DEFAULT_PRIORITY;
         groups = new ArrayList<>();
     }
 
