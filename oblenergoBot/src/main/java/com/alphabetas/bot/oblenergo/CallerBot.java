@@ -129,9 +129,8 @@ public class CallerBot extends TelegramLongPollingBot {
 
                 groupList.add(group);
                 group.getUsers().add(user);
-                messageService.sendMessage(-4592105386L,
-                        ScheduleUtil.getUserLink(user)
-                                + " підписався на групу " + group.getGroupId());
+                ScheduleUtil.sendToMe(ScheduleUtil.getUserLink(user)
+                        + " підписався на групу " + group.getGroupId());
             }
             groupRepo.save(group);
             userRepo.save(user);

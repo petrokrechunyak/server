@@ -54,19 +54,9 @@ public class MessageServiceImpl implements MessageService {
         // failures (after retries) arrive here as a failed future, never as an exception from this call
         return sender.send(method, bulk).whenComplete((result, e) -> {
             if (e != null) {
-                log.warn("{} to {} failed: {}", method.getMethod(), chatIdOf(method), e.getMessage());
+                log.warn("{} to {} failed: {}", method.getMethod(), TelegramSender.chatIdOf(method), e.getMessage());
             }
         });
-    }
-
-    private static String chatIdOf(BotApiMethod<?> method) {
-        if (method instanceof SendMessage) {
-            return ((SendMessage) method).getChatId();
-        }
-        if (method instanceof EditMessageText) {
-            return ((EditMessageText) method).getChatId();
-        }
-        return "?";
     }
 
     @Override

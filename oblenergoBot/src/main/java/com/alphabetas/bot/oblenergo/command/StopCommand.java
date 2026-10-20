@@ -34,7 +34,7 @@ public class StopCommand implements Command{
         service.sendMessage(u.getUserId(),
                 "Вас успішно відписано від графіків відключення!\n" +
                         "Для відновлення підписки напишіть /start");
-        service.sendMessage(-4592105386L, ScheduleUtil.getUserLink(u)
+        ScheduleUtil.sendToMe(ScheduleUtil.getUserLink(u)
                 + " - відписався(");
     }
 }

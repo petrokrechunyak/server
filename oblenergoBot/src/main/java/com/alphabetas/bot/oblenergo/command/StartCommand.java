@@ -64,7 +64,7 @@ public class StartCommand implements Command {
         userRepo.save(u);
 
         service.sendMessage(prepareMessage(u));
-        service.sendMessage(-4592105386L, ScheduleUtil.getUserLink(u) + " -" + (wasSubscribed ? " знову" : " <u><b>вперше</b></u>") + " підписався)");
+        ScheduleUtil.sendToMe(ScheduleUtil.getUserLink(u) + " -" + (wasSubscribed ? " знову" : " <u><b>вперше</b></u>") + " підписався)");
         }
 
     SendMessage prepareMessage(User user) {

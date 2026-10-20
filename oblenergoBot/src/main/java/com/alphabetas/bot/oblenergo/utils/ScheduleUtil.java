@@ -47,7 +47,6 @@ public class ScheduleUtil {
             "Графіки погодинних відключень тимчасово не діють. Відключення можуть бути без попередження.\n\n" +
             "Коли графіки знову почнуть діяти, вас буде повідомлено.";
     private static final String EMERGENCY_ENDED_TEXT = "✅ <b>Екстрені відключення скасовано, графіки знову діють.</b>\n\n";
-    private static final int MAX_MESSAGE_LENGTH = 4096;
     // one char per half-hour slot: з - powered, в - off, м - maybe powered
     private static final Pattern SCHEDULE_PATTERN = Pattern.compile("[взм]{" + (dates.length - 1) + "}");
 
@@ -56,6 +55,7 @@ public class ScheduleUtil {
         ScheduleUtil.userRepo = userRepo;
         ScheduleUtil.groupRepo = groupRepo;
         ScheduleUtil.currentDateRepo = currentDateRepo;
+        LogChat.init(messageService);
     }
 
     // synchronized: /refresh and the scheduler could otherwise both detect the same change and broadcast it twice
@@ -192,54 +192,16 @@ public class ScheduleUtil {
                     .sorted()
                     .map(messages::get)
                     .filter(Objects::nonNull)
+                    .map(String::stripTrailing)
                     .collect(Collectors.toList());
-            // queued back to back, so a user's messages go out one right after another, in group order
-            for (String message : packMessages(prefix, parts)) {
+            // worst case one group takes ~1200 chars detailed and ~1400 compact, so at least 3 detailed
+            // or 2 compact groups always fit in one message; queued back to back, in group order
+            for (String message : MainUtil.joinWithinLimit(prefix, parts, "\n\n")) {
                 sends.add(sendMessageToUser(user, message));
             }
         }
         String groupIds = updated.stream().map(group -> group.getGroupId().toString()).collect(Collectors.joining(", "));
         reportWhenSent(sends.toArray(new CompletableFuture[0]), "з графіками груп " + groupIds, time);
-    }
-
-    /**
-     * Joins group schedules into as few messages as fit Telegram's length limit, never splitting
-     * one group's schedule between messages. The prefix goes only at the start of the first message.
-     * <p>
-     * Worst case one group takes ~1200 chars detailed and ~1400 compact, so at least 3 detailed
-     * or 2 compact groups always fit in one message.
-     */
-    private static List<String> packMessages(String prefix, List<String> parts) {
-        List<String> messages = new ArrayList<>();
-        StringBuilder current = new StringBuilder(prefix);
-        int length = visibleLength(prefix);
-        boolean empty = true;
-        for (String rawPart : parts) {
-            String part = rawPart.stripTrailing();
-            int partLength = visibleLength(part);
-            if (!empty && length + 2 + partLength > MAX_MESSAGE_LENGTH) {
-                messages.add(current.toString());
-                current = new StringBuilder();
-                length = 0;
-                empty = true;
-            }
-            if (!empty) {
-                current.append("\n\n");
-                length += 2;
-            }
-            current.append(part);
-            length += partLength;
-            empty = false;
-        }
-        if (!empty) {
-            messages.add(current.toString());
-        }
-        return messages;
-    }
-
-    // Telegram's limit applies to the text after HTML parsing, counted in UTF-16 units like String.length()
-    private static int visibleLength(String html) {
-        return html.replaceAll("<[^>]+>", "").length();
     }
 
     // sends are async, so report only once they have actually finished
@@ -346,14 +308,14 @@ public class ScheduleUtil {
             return (newDay || g.getOldShutdowns() == null
                     ? "Графік на <b>" + date + "</b>"
                     : "Зміни в графіку на <b>" + date + "</b>")
-                    + " в групі <u>" + g.getGroupId() + "</u>\n\n"
+                    + " в групі <u>" + g.getGroupId() + "</u>\n"
                     + "💡 Світло буде <b>весь день</b>";
         }
         builder.append(newDay || g.getOldShutdowns() == null
                 ? "Графік на <b>" + date + "</b>"
                 : "Зміни в графіку на <b>" + date + "</b>")
                 .append(" в групі <u>")
-                .append(g.getGroupId()).append("</u>\n\n");
+                .append(g.getGroupId()).append("</u>\n");
 
         char prev = newSchedule.charAt(0);
         int startIndex = 0;
@@ -404,7 +366,7 @@ public class ScheduleUtil {
         userRepo.findById(userId).filter(User::getSubscribed).ifPresent(user -> {
             user.setSubscribed(false);
             userRepo.save(user);
-            messageService.sendMessage(-4592105386L, getUserLink(user) + " - кинув бота в чс((");
+            sendToMe(getUserLink(user) + " - кинув бота в чс((");
         });
     }
 
@@ -413,7 +375,8 @@ public class ScheduleUtil {
                 + ((user.getUsername() == null) ? "" : " - @" + user.getUsername());
     }
 
+    // every notification for the admin log chat goes through here: it is batched, see LogChat
     public static void sendToMe(String s) {
-        messageService.sendMessage(-4592105386L, s);
+        LogChat.send(s);
     }
 }

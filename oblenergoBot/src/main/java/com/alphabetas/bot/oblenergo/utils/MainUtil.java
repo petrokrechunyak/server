@@ -31,6 +31,7 @@ import java.util.logging.Logger;
 public class MainUtil {
 
     public static final Long ADMIN_ID = 731921794L;
+    private static final int MAX_MESSAGE_LENGTH = 4096;
 
     public static final String GROUP_SELECTION_TEXT =
             "Виберіть групу по якій хочете отримувати графіки(можна вибрати декілька)!\n" +
@@ -153,6 +154,42 @@ public class MainUtil {
 
     public static String makeLink(Long id, String firstName) {
         return String.format("<a href='tg://user?id=%d'>%s</a>", id, escapeHtml(firstName));
+    }
+
+    /**
+     * Joins parts into as few messages as fit Telegram's length limit, never splitting a part between messages.
+     * The prefix goes only at the start of the first message.
+     */
+    public static List<String> joinWithinLimit(String prefix, List<String> parts, String separator) {
+        List<String> messages = new ArrayList<>();
+        StringBuilder current = new StringBuilder(prefix);
+        int length = visibleLength(prefix);
+        boolean empty = true;
+        for (String part : parts) {
+            int partLength = visibleLength(part);
+            if (!empty && length + separator.length() + partLength > MAX_MESSAGE_LENGTH) {
+                messages.add(current.toString());
+                current = new StringBuilder();
+                length = 0;
+                empty = true;
+            }
+            if (!empty) {
+                current.append(separator);
+                length += separator.length();
+            }
+            current.append(part);
+            length += partLength;
+            empty = false;
+        }
+        if (!empty) {
+            messages.add(current.toString());
+        }
+        return messages;
+    }
+
+    // Telegram's limit applies to the text after HTML parsing, counted in UTF-16 units like String.length()
+    public static int visibleLength(String html) {
+        return html.replaceAll("<[^>]+>", "").length();
     }
 
     public static String escapeHtml(String input) {
